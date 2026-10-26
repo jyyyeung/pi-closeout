@@ -1,8 +1,9 @@
 /**
  * Registry rows + Work-Session identity.
  *
- * Identity convention: `harness/<short-id> (<label>)` — the exact string a
- * commit carries as a `Work-Session:` trailer. Rows are appended to the
+ * Identity convention: pi sessions emit the bare full PI_SESSION_ID (the
+ * exact string a commit carries as a `Work-Session:` trailer); other
+ * harnesses fall back to `harness/<short-id> (<label>)`. Rows are appended to the
  * workspace registry when one exists (pi-checkout-guard compatible: presence
  * rows from that package and identity/closeout rows from this one interleave
  * in one file).
@@ -71,7 +72,11 @@ export function appendRow(registry: RegistryMode, row: CloseoutRow): void {
   }
 }
 
-/** `harness/<8-char-id> (label)` identity for commit trailers. */
+/**
+ * Identity for commit trailers. Precedence: WORK_SESSION force, then the
+ * bare full PI_SESSION_ID (pi harness convention: no prefix, no label),
+ * then the legacy `harness/<8-char-id> (label)` form for other harnesses.
+ */
 export function workIdentity(
   harness: string,
   shortId: string,
@@ -80,6 +85,8 @@ export function workIdentity(
 ): string {
   const forced = env.WORK_SESSION;
   if (forced) return forced;
+  const sessionId = env.PI_SESSION_ID;
+  if (sessionId) return sessionId;
   const id = shortId ? shortId.slice(0, 8) : "unknown";
   return `${harness}/${id} (${label})`;
 }

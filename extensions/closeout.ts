@@ -1,8 +1,9 @@
 /**
  * pi-closeout extension for the pi coding agent.
  *
- * 1. IDENTITY — session_start appends a Work-Session identity row
- *    (`pi/<id8> (name)`) to the workspace registry. That string is what
+ * 1. IDENTITY — session_start appends a Work-Session identity row (the bare
+ *    full session id on pi; legacy `harness/<id8> (name)` elsewhere) to the
+ *    workspace registry. That string is what
  *    commits should carry as a `Work-Session:` trailer.
  *
  * 2. GATE — `/closeout` runs the closeout checks (staged sweep-fuel,

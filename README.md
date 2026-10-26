@@ -28,7 +28,7 @@ session-closeout: 2 finding(s)
 | **Closeout gate** | Flags staged-but-uncommitted (sweep fuel), untracked files (stash-bait), dirty child repos (nested `.git`, depth ≤ 2), and open claims in your task file. Modified-but-committed-nothing root files are informational notes. |
 | **`/closeout` command** | Runs the gate, reports inline. `--strict` throws on findings (script/CI use). |
 | **Shutdown gate** | Runs once, best-effort, at session end — records the findings count so "closed with N loose ends" is greppable history. Never blocks shutdown. |
-| **Work-Session identity** | At session start, derives `pi/<id8> (name)` and appends an identity row — the exact string commits should carry as a `Work-Session:` trailer (advisory). |
+| **Work-Session identity** | At session start, derives the identity string (bare full PI_SESSION_ID on pi; legacy `harness/<id8> (name)` elsewhere) and appends an identity row — the exact string commits should carry as a `Work-Session:` trailer (advisory). |
 | **Registry synergy** | Reuses a [pi-checkout-guard](https://github.com/jyyyeung/pi-checkout-guard) registry when present (identity/closeout rows interleave with presence rows), a legacy `.session-registry.jsonl`, or falls back to `.pi-closeout.jsonl`. |
 | **Harness-agnostic script** | `scripts/session-closeout.sh` runs the same gate for humans, Claude Code (`Stop` hook), Codex, cron — env-configurable, zero dependencies beyond git. |
 
@@ -84,8 +84,8 @@ after.
 ## Registry rows
 
 ```jsonl
-{"ts":1730000000000,"type":"identity","name":"alice","pid":4242,"identity":"pi/01a2b3c4 (alice)"}
-{"ts":1730000600000,"type":"closeout","name":"alice","pid":4242,"identity":"pi/01a2b3c4 (alice)","ok":true,"findings":2}
+{"ts":1730000000000,"type":"identity","name":"alice","pid":4242,"identity":"01a2b3c4-56af-75c8-a90d-2a0359a79cbc"}
+{"ts":1730000600000,"type":"closeout","name":"alice","pid":4242,"identity":"01a2b3c4-56af-75c8-a90d-2a0359a79cbc","ok":true,"findings":2}
 ```
 
 ## Development

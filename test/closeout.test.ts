@@ -169,6 +169,16 @@ test("identity: WORK_SESSION forces; short-id truncation", () => {
   assert.equal(workIdentity("pi", "xyz", "bob", { WORK_SESSION: "custom/id (label)" }), "custom/id (label)");
 });
 
+test("identity: PI_SESSION_ID emits bare full id; WORK_SESSION still wins", () => {
+  const full = "01a1766a-56af-75c8-a90d-2a0359a79cbc";
+  assert.equal(workIdentity("pi", "01a2b3c4", "alice", { PI_SESSION_ID: full }), full);
+  assert.equal(
+    workIdentity("pi", "01a2b3c4", "alice", { PI_SESSION_ID: full, WORK_SESSION: "forced (x)" }),
+    "forced (x)",
+  );
+  assert.equal(workIdentity("claude", "", "bob", {}), "claude/unknown (bob)");
+});
+
 test("repoRoot: real git repo resolves (integration)", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "closeout-git-"));
   execFileSync("git", ["init", "-q", root]);
