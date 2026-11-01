@@ -1,9 +1,18 @@
 {
   "name": "pi-closeout",
   "version": "0.1.2",
-  "type": "module",
-  "license": "MIT",
   "description": "Session closeout gate for coding agents: flags staged-but-uncommitted sweep fuel, untracked stash-bait, dirty child repos, and open task claims when a session ends — plus Work-Session identity rows.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "extensions/",
+    "src/",
+    "skills/",
+    "scripts/",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -16,19 +25,30 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/jyyyeung/pi-closeout.git"
+    "url": "git+https://github.com/jyyyeung/pi-closeout.git"
   },
-  "pi": {
-    "extensions": ["./extensions/closeout.ts"],
-    "skills": ["./skills/closeout"]
+  "homepage": "https://github.com/jyyyeung/pi-closeout#readme",
+  "bugs": {
+    "url": "https://github.com/jyyyeung/pi-closeout/issues"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": ">=1.3.0"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^1.3.0",
     "@types/node": "^24.0.0",
     "typescript": "^5.7.0"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/closeout.ts"
+    ],
+    "skills": [
+      "./skills/closeout"
+    ]
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
