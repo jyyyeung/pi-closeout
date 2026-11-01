@@ -25,6 +25,9 @@ unclaimed task lines go stale.
      hand off explicitly.
    - `claim` — open claims in the task file: resolve, or re-claim with a
      fresh date.
+   - `trailer` — recent commits missing the `Work-Session` trailer (only
+     when the repo already uses the convention): amend unpushed commits to
+     add it; leave pushed ones and note the gap in your handoff.
 3. **Notes (`•`) are informational** — modified files at the root are fine if
    they are deliberate WIP; mention them when handing off.
 4. **Record identity**: commits you make during the session should carry a
