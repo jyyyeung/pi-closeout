@@ -92,7 +92,8 @@ fi
 
 # Work-Session trailer check — same auto-detect as the extension: when none of
 # the last 30 commits on HEAD carries a Work-Session trailer, the convention
-# is treated as not in use and this check says nothing.
+# is treated as not in use and this check says nothing. Merge commits are
+# excluded (--no-merges): server-generated merge commits never carry trailers.
 ws_mode="auto"
 case "${CHECK_WORK_SESSION_TRAILER:-}" in
   true|TRUE) ws_mode=true ;;
@@ -115,7 +116,7 @@ if [ "$ws_mode" != false ] && git symbolic-ref -q HEAD >/dev/null 2>&1; then
     else
       ws_missing+=("$sha $subject")
     fi
-  done < <(git log -n 30 --pretty=format:'%h%x1f%s%x1f%(trailers)%x1e' 2>/dev/null || true)
+  done < <(git log -n 30 --no-merges --pretty=format:'%h%x1f%s%x1f%(trailers)%x1e' 2>/dev/null || true)
   if [ "$ws_mode" = auto ] && [ "$ws_with" -eq 0 ]; then
     : # convention absent — stay silent
   elif [ "${#ws_missing[@]}" -gt 0 ]; then

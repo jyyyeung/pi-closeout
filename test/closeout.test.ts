@@ -232,6 +232,22 @@ test("work-session trailer: flags 2 of 3 recent commits missing it (named short 
   assert.ok(!f!.detail.includes("first")); // trailer-carrying commit not named
 });
 
+test("work-session trailer: merge commits without trailer excluded, non-merge still flagged", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "first", "sess-a");
+  const base = execFileSync("git", ["-C", root, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
+  execFileSync("git", ["-C", root, "checkout", "-q", "-b", "side"]);
+  wsCommit(root, "side-work");
+  execFileSync("git", ["-C", root, "checkout", "-q", base]);
+  execFileSync("git", ["-C", root, "merge", "--no-ff", "-q", "-m", "merge side", "side"]);
+  const sha = wsCommit(root, "after-merge");
+  const res = runCloseout(root, defaultConfig());
+  const f = res.findings.find((x) => x.kind === "trailer");
+  assert.ok(f, "expected a trailer finding");
+  assert.match(f!.detail, new RegExp(`${sha} after-merge — no Work-Session trailer`));
+  assert.ok(!f!.detail.includes("merge side"), "merge commit must not be named");
+});
+
 test("work-session trailer: capped at 10 lines with overflow count", () => {
   const root = gitHistoryRepo();
   wsCommit(root, "base", "sess-0"); // establishes the convention

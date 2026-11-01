@@ -126,7 +126,9 @@ export function runCloseout(
  * surfaces later (broken provenance queries). Catch it at closeout — but
  * only where the convention is in use: "auto" skips silently when none of
  * the last 30 commits on HEAD carries the trailer, so convention-less
- * repos get zero output.
+ * repos get zero output. Merge commits are excluded (`--no-merges`): the
+ * git server, not a local prepare-commit-msg hook, creates UI-generated
+ * merge commits, so they never carry the trailer by design.
  * ---------------------------------------------------------------- */
 
 /** Detection window and per-finding cap. */
@@ -176,7 +178,7 @@ function workSessionTrailerCheck(
   // Detached HEAD (or git error): skip silently — checks never throw.
   if (!safe(() => run(["symbolic-ref", "--quiet", "HEAD"], root))) return;
   const recent = parseTrailerLog(
-    safe(() => run(["log", "-n", String(WS_WINDOW), "--pretty=format:%h%x1f%s%x1f%(trailers)%x1e"], root)),
+    safe(() => run(["log", "-n", String(WS_WINDOW), "--no-merges", "--pretty=format:%h%x1f%s%x1f%(trailers)%x1e"], root)),
   );
   const conventionInUse = mode === true || recent.some((c) => c.hasWorkSession);
   if (!conventionInUse) return; // auto + convention absent: silent
