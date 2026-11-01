@@ -23,6 +23,13 @@ export interface CloseoutConfig {
   /** Untracked paths never counted as findings (registry/config files). */
   ignoreUntracked: string[];
   /**
+   * Flag recent commits missing a `Work-Session:` trailer. "auto" (default)
+   * runs the check only when the convention is already in use — any of the
+   * last 30 commits on HEAD carries the trailer; otherwise the check stays
+   * completely silent. `true` always checks; `false` disables.
+   */
+  checkWorkSessionTrailer: "auto" | boolean;
+  /**
    * Where identity/closeout rows are appended: "auto" (reuse a
    * pi-checkout-guard registry when present, else <root>/.pi-closeout.jsonl),
    * "none", or an explicit path (absolute, or relative to repo root).
@@ -42,6 +49,7 @@ export function defaultConfig(): CloseoutConfig {
     checkUntracked: true,
     ignoreUntracked: [".session-registry.jsonl", CONFIG_FILE],
     registry: "auto",
+    checkWorkSessionTrailer: "auto",
   };
 }
 
@@ -66,5 +74,7 @@ export function loadConfig(root: string, readFile: (p: string) => string = (p) =
     merged.ignoreUntracked = c.ignoreUntracked.filter((f): f is string => typeof f === "string");
   }
   if (typeof c.registry === "string" && c.registry) merged.registry = c.registry;
+  const ws = c.checkWorkSessionTrailer;
+  if (ws === "auto" || ws === true || ws === false) merged.checkWorkSessionTrailer = ws;
   return merged;
 }

@@ -32,6 +32,16 @@ session-closeout: 2 finding(s)
 | **Registry synergy** | Reuses a [pi-checkout-guard](https://github.com/jyyyeung/pi-checkout-guard) registry when present (identity/closeout rows interleave with presence rows), a legacy `.session-registry.jsonl`, or falls back to `.pi-closeout.jsonl`. |
 | **Harness-agnostic script** | `scripts/session-closeout.sh` runs the same gate for humans, Claude Code (`Stop` hook), Codex, cron — env-configurable, zero dependencies beyond git. |
 
+**Work-Session trailers.** Some host setups stamp every commit with an
+advisory `Work-Session: <session-id>` trailer (via a prepare-commit-msg hook),
+so later provenance queries can attribute commits to sessions. On detached or
+edge commit paths the injection can miss, and the gap only surfaces when those
+queries come up empty. The gate flags recent commits missing the trailer — the
+10 most recent, plus an overflow count. Detection is automatic and quiet: it
+inspects the last 30 commits, and if none carries a `Work-Session` trailer the
+convention is treated as not in use and the check emits nothing at all — repos
+that never adopted it get zero extra output.
+
 ## Install
 
 ```bash
@@ -49,7 +59,8 @@ root:
   "checkStaged": true,
   "checkUntracked": true,
   "ignoreUntracked": [".session-registry.jsonl"],
-  "registry": "auto"
+  "registry": "auto",
+  "checkWorkSessionTrailer": "auto"
 }
 ```
 
@@ -61,6 +72,7 @@ root:
 | `checkStaged` / `checkUntracked` | `true` | Toggle the two hard findings. |
 | `ignoreUntracked` | see above | Untracked paths never flagged. |
 | `registry` | `"auto"` | `"auto"` / `"none"` / explicit path for identity+closeout rows. |
+| `checkWorkSessionTrailer` | `"auto"` | `"auto"` flags commits missing the `Work-Session:` trailer only when the convention is detected in the last 30 commits (completely silent otherwise); `true` always checks; `false` disables. |
 
 Disable entirely with `CLOSEOUT_DISABLE=1`. Set `WORK_SESSION` to force the
 identity string (any harness).

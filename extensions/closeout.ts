@@ -7,8 +7,9 @@
  *    commits should carry as a `Work-Session:` trailer.
  *
  * 2. GATE — `/closeout` runs the closeout checks (staged sweep-fuel,
- *    untracked stash-bait, dirty child repos, open claims) and reports
- *    findings inline. `--strict` prefix exits nonzero (for scripts).
+ *    untracked stash-bait, dirty child repos, open claims, Work-Session
+ *    trailer gaps — auto-detected, silent where the convention is unused)
+ *    and reports findings inline. `--strict` prefix exits nonzero (for scripts).
  *
  * 3. SHUTDOWN — session_shutdown runs the gate best-effort and records the
  *    findings count, so "this session closed with N loose ends" is a
@@ -52,7 +53,7 @@ export default function closeoutExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("closeout", {
-    description: "Run the session closeout gate (staged sweep-fuel, untracked stash-bait, dirty child repos, open claims)",
+    description: "Run the session closeout gate (staged sweep-fuel, untracked stash-bait, dirty child repos, open claims, Work-Session trailer gaps)",
     handler: async (args: string, ctx) => {
       const strict = /(^|\s)--strict\b/.test(args ?? "");
       const res = gate(strict);

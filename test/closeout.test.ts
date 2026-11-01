@@ -187,3 +187,107 @@ test("repoRoot: real git repo resolves (integration)", () => {
   const top = repoRoot(path.join(root, "sub"));
   assert.equal(top, root);
 });
+
+/* ---------------- Work-Session trailer check (real tmp repos) ---------------- */
+
+/** Real git repo with committed history — the trailer check needs git log. */
+function gitHistoryRepo(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "closeout-ws-"));
+  execFileSync("git", ["init", "-q", root]);
+  execFileSync("git", ["-C", root, "config", "user.email", "closeout@example.com"]);
+  execFileSync("git", ["-C", root, "config", "user.name", "closeout-test"]);
+  return root;
+}
+
+/** Commit a subject, optionally stamped with a Work-Session trailer. Returns short sha. */
+function wsCommit(root: string, subject: string, session?: string): string {
+  write(root, `f-${Math.random().toString(36).slice(2)}.txt`, String(Math.random()));
+  execFileSync("git", ["-C", root, "add", "-A"]);
+  const args = ["-C", root, "commit", "-q", "--allow-empty", "-m", subject];
+  if (session !== undefined) args.push("-m", `Work-Session: ${session}`);
+  execFileSync("git", args);
+  return execFileSync("git", ["-C", root, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+}
+
+test("work-session trailer: auto stays silent when convention absent", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "one");
+  wsCommit(root, "two");
+  wsCommit(root, "three");
+  const res = runCloseout(root, defaultConfig()); // default: "auto"
+  assert.equal(res.findings.filter((f) => f.kind === "trailer").length, 0);
+  assert.ok(!res.notes.some((n) => n.includes("Work-Session")));
+});
+
+test("work-session trailer: flags 2 of 3 recent commits missing it (named short shas)", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "first", "sess-a");
+  const sha2 = wsCommit(root, "second");
+  const sha3 = wsCommit(root, "third");
+  const res = runCloseout(root, defaultConfig());
+  const f = res.findings.find((x) => x.kind === "trailer");
+  assert.ok(f, "expected a trailer finding");
+  assert.match(f!.detail, new RegExp(`${sha2} second — no Work-Session trailer`));
+  assert.match(f!.detail, new RegExp(`${sha3} third — no Work-Session trailer`));
+  assert.ok(!f!.detail.includes("first")); // trailer-carrying commit not named
+});
+
+test("work-session trailer: capped at 10 lines with overflow count", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "base", "sess-0"); // establishes the convention
+  for (let i = 1; i <= 15; i++) wsCommit(root, `c${i}`);
+  const res = runCloseout(root, defaultConfig());
+  const f = res.findings.find((x) => x.kind === "trailer");
+  assert.ok(f, "expected a trailer finding");
+  const perCommit = f!.detail.split("\n").filter((l) => l.includes("— no Work-Session trailer"));
+  assert.equal(perCommit.length, 10);
+  assert.match(f!.detail, /…and 5 older commits without trailers/);
+});
+
+test("work-session trailer: false disables even with convention present", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "a", "sess-a");
+  wsCommit(root, "b");
+  const config = defaultConfig();
+  config.checkWorkSessionTrailer = false;
+  const res = runCloseout(root, config);
+  assert.equal(res.findings.filter((f) => f.kind === "trailer").length, 0);
+  assert.ok(!res.notes.some((n) => n.includes("Work-Session")));
+});
+
+test("work-session trailer: true flags even without prior convention", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "a");
+  wsCommit(root, "b");
+  const config = defaultConfig();
+  config.checkWorkSessionTrailer = true;
+  const res = runCloseout(root, config);
+  const f = res.findings.find((x) => x.kind === "trailer");
+  assert.ok(f, "expected a trailer finding");
+  assert.match(f!.detail, /b — no Work-Session trailer/);
+});
+
+test("work-session trailer: detached HEAD skips silently", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "a", "sess-a");
+  wsCommit(root, "b");
+  execFileSync("git", ["-C", root, "checkout", "-q", "--detach", "HEAD"]);
+  const res = runCloseout(root, defaultConfig());
+  assert.equal(res.findings.filter((f) => f.kind === "trailer").length, 0);
+  assert.ok(!res.notes.some((n) => n.includes("Work-Session")));
+});
+
+test("config: checkWorkSessionTrailer accepts auto/true/false; invalid falls back", () => {
+  const root = gitRepo();
+  assert.equal(loadConfig(root).checkWorkSessionTrailer, "auto");
+  for (const [value, expected] of [
+    ["auto", "auto"],
+    [true, true],
+    [false, false],
+    ["sometimes", "auto"],
+    [1, "auto"],
+  ] as const) {
+    write(root, ".pi-closeout.json", JSON.stringify({ checkWorkSessionTrailer: value }));
+    assert.equal(loadConfig(root).checkWorkSessionTrailer, expected);
+  }
+});

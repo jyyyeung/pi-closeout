@@ -9,12 +9,16 @@
 #   3. modified files at this root   (informational)
 #   4. child repos with dirty trees  (informational)
 #   5. open claims in CLAIMS_FILE    (default TASKS.md, pattern CLAIMS_PATTERN)
+#   6. recent commits missing the Work-Session trailer (auto-detected; silent
+#      when the convention is not in use — set CHECK_WORK_SESSION_TRAILER to
+#      true/false to force/skip)
 #
 # Exit codes: 0 = clean or advisory findings; 1 = findings with --strict;
 #             2 = usage/context error.
 #
 # Env overrides: WORK_SESSION (identity string), CLAIMS_FILE, CLAIMS_PATTERN,
-#                CLOSEOUT_REGISTRY (file to append a closeout row to).
+#                CLOSEOUT_REGISTRY (file to append a closeout row to),
+#                CHECK_WORK_SESSION_TRAILER (auto/true/false).
 set -euo pipefail
 strict=0
 for arg in "$@"; do
@@ -84,6 +88,49 @@ if [ -f "$claims_file" ]; then
   fi
 else
   note "✓ no $claims_file"
+fi
+
+# Work-Session trailer check — same auto-detect as the extension: when none of
+# the last 30 commits on HEAD carries a Work-Session trailer, the convention
+# is treated as not in use and this check says nothing.
+ws_mode="auto"
+case "${CHECK_WORK_SESSION_TRAILER:-}" in
+  true|TRUE) ws_mode=true ;;
+  false|FALSE) ws_mode=false ;;
+esac
+if [ "$ws_mode" != false ] && git symbolic-ref -q HEAD >/dev/null 2>&1; then
+  ws_missing=()
+  ws_total=0
+  ws_with=0
+  while IFS= read -r -d $'\x1e' rec; do
+    rec="${rec#$'\n'}"
+    sha="${rec%%$'\x1f'*}"
+    rest="${rec#*$'\x1f'}"
+    subject="${rest%%$'\x1f'*}"
+    trailers="${rest#*$'\x1f'}"
+    [ -n "$sha" ] || continue
+    ws_total=$((ws_total+1))
+    if printf '%s\n' "$trailers" | grep -qiE '^[[:space:]]*Work-Session:[[:space:]]*[^[:space:]]'; then
+      ws_with=$((ws_with+1))
+    else
+      ws_missing+=("$sha $subject")
+    fi
+  done < <(git log -n 30 --pretty=format:'%h%x1f%s%x1f%(trailers)%x1e' 2>/dev/null || true)
+  if [ "$ws_mode" = auto ] && [ "$ws_with" -eq 0 ]; then
+    : # convention absent — stay silent
+  elif [ "${#ws_missing[@]}" -gt 0 ]; then
+    flag "recent commits missing the Work-Session trailer (provenance queries will miss them):"
+    i=0
+    for m in "${ws_missing[@]}"; do
+      i=$((i+1))
+      [ "$i" -gt 10 ] && break
+      note "  $m — no Work-Session trailer"
+    done
+    extra=$(( ${#ws_missing[@]} - 10 ))
+    [ "$extra" -gt 0 ] && note "  …and $extra older commits without trailers"
+  elif [ "$ws_total" -gt 0 ]; then
+    note "✓ recent commits carry Work-Session trailers"
+  fi
 fi
 
 if [ -n "$identity" ] && [ -n "${CLOSEOUT_REGISTRY:-}" ] && [ -f "$CLOSEOUT_REGISTRY" ]; then
