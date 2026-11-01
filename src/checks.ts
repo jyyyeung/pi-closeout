@@ -129,6 +129,11 @@ export function runCloseout(
  * repos get zero output. Merge commits are excluded (`--no-merges`): the
  * git server, not a local prepare-commit-msg hook, creates UI-generated
  * merge commits, so they never carry the trailer by design.
+ *
+ * "auto" also scopes to commits NEWER than the newest trailer-bearing commit:
+ * history from before the convention was adopted is not a gap, and flagging
+ * it (init, the first imports) buried the real miss in noise. `true` opts out
+ * of that scoping and checks every non-merge commit in the window.
  * ---------------------------------------------------------------- */
 
 /** Detection window and per-finding cap. */
@@ -180,9 +185,11 @@ function workSessionTrailerCheck(
   const recent = parseTrailerLog(
     safe(() => run(["log", "-n", String(WS_WINDOW), "--no-merges", "--pretty=format:%h%x1f%s%x1f%(trailers)%x1e"], root)),
   );
-  const conventionInUse = mode === true || recent.some((c) => c.hasWorkSession);
-  if (!conventionInUse) return; // auto + convention absent: silent
-  const missing = recent.filter((c) => !c.hasWorkSession);
+  const firstStamped = recent.findIndex((c) => c.hasWorkSession);
+  if (mode !== true && firstStamped < 0) return; // auto + convention absent: silent
+  // auto: only commits newer than the newest stamped one can be gaps.
+  const candidates = mode === true ? recent : recent.slice(0, firstStamped);
+  const missing = candidates.filter((c) => !c.hasWorkSession);
   if (missing.length === 0) {
     if (recent.length > 0) notes.push("recent commits carry Work-Session trailers");
     return;

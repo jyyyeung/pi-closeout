@@ -136,10 +136,10 @@ test("config: defaults, merge, bad json tolerated", () => {
   assert.deepEqual(loadConfig(root).claimsFiles, ["TASKS.md"]); // falls back
 });
 
-test("registry: auto reuses guard registry, then legacy, then fallback", () => {
+test("registry: auto reuses guard registry, then legacy, then fallback outside the worktree", () => {
   const root = gitRepo();
-  // none exist -> fallback
-  assert.deepEqual(resolveRegistry(root, "auto"), { path: path.join(root, ".pi-closeout.jsonl") });
+  // none exist -> fallback lives in the git dir, never as an untracked worktree file
+  assert.deepEqual(resolveRegistry(root, "auto"), { path: path.join(root, ".git", "pi-closeout", "registry.jsonl") });
   // legacy present -> reused
   write(root, ".session-registry.jsonl", "");
   assert.deepEqual(resolveRegistry(root, "auto"), { path: path.join(root, ".session-registry.jsonl") });
@@ -156,7 +156,8 @@ test("registry: rows appended (identity + closeout), none-mode silent", () => {
   const reg = resolveRegistry(root, "auto");
   appendRow(reg, { ts: 1, type: "identity", name: "a", pid: 1, identity: "pi/x (a)" });
   appendRow(reg, { ts: 2, type: "closeout", name: "a", pid: 1, identity: "pi/x (a)", ok: true, findings: 3 });
-  const lines = fs.readFileSync(path.join(root, ".pi-closeout.jsonl"), "utf8").trim().split("\n");
+  assert.ok(reg !== "none");
+  const lines = fs.readFileSync(reg.path, "utf8").trim().split("\n");
   assert.equal(lines.length, 2);
   assert.match(lines[1], /"findings":3/);
   appendRow("none", { ts: 3, type: "identity", name: "a", pid: 1 });
@@ -185,7 +186,8 @@ test("repoRoot: real git repo resolves (integration)", () => {
   write(root, "a.txt", "x");
   fs.mkdirSync(path.join(root, "sub"));
   const top = repoRoot(path.join(root, "sub"));
-  assert.equal(top, root);
+  // macOS /tmp is a symlink to /private/tmp: git reports the resolved path.
+  assert.equal(fs.realpathSync(top!), fs.realpathSync(root));
 });
 
 /* ---------------- Work-Session trailer check (real tmp repos) ---------------- */
@@ -306,4 +308,36 @@ test("config: checkWorkSessionTrailer accepts auto/true/false; invalid falls bac
     write(root, ".pi-closeout.json", JSON.stringify({ checkWorkSessionTrailer: value }));
     assert.equal(loadConfig(root).checkWorkSessionTrailer, expected);
   }
+});
+
+test("work-session trailer: pre-convention commits are not gaps (auto)", () => {
+  const root = gitHistoryRepo();
+  wsCommit(root, "init"); // before the convention
+  wsCommit(root, "scaffolding");
+  wsCommit(root, "first stamped", "sess-a"); // convention starts here
+  const gap = wsCommit(root, "forgot the trailer");
+  const res = runCloseout(root, defaultConfig());
+  const f = res.findings.find((x) => x.kind === "trailer");
+  assert.ok(f, "expected a trailer finding");
+  assert.match(f!.detail, new RegExp(`${gap} forgot the trailer`));
+  assert.ok(!f!.detail.includes("init"), "pre-convention commit must not be named");
+  assert.ok(!f!.detail.includes("scaffolding"), "pre-convention commit must not be named");
+});
+
+test("registry: fallback row file does not pollute the worktree (self-pollution)", () => {
+  const root = gitHistoryRepo();
+  write(root, "a.txt", "x");
+  execFileSync("git", ["-C", root, "add", "-A"]);
+  execFileSync("git", ["-C", root, "commit", "-q", "-m", "init"]);
+  const config = defaultConfig();
+  const registry = resolveRegistry(root, "auto");
+  assert.ok(registry !== "none");
+  appendRow(registry, { ts: Date.now(), type: "identity", name: "a", pid: 1, identity: "sess-a" });
+  const res = runCloseout(root, config);
+  assert.equal(
+    res.findings.filter((f) => f.kind === "untracked").length,
+    0,
+    `registry at ${registry.path} must stay out of findings: ${JSON.stringify(res.findings)}`,
+  );
+  assert.ok(!registry.path.startsWith(root + path.sep) || registry.path.includes(`${path.sep}.git${path.sep}`));
 });

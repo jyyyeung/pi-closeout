@@ -14,10 +14,31 @@ import * as path from "node:path";
 
 export type RegistryMode = { path: string } | "none";
 
+/** Fallback row file name (used when no guard registry is discoverable). */
+export const REGISTRY_FILE = ".pi-closeout.jsonl";
+
+/**
+ * Last-resort registry location. Inside a real git repo this lives under the
+ * git dir, NOT the worktree: a registry in the worktree would be an untracked
+ * file that the closeout gate itself then reports as a finding, and it would
+ * pollute every `git status` in the shared checkout. Only a non-git root (or a
+ * linked worktree, where .git is a file) falls back to the root, and there
+ * config.ignoreUntracked keeps that name out of findings.
+ */
+export function fallbackRegistryPath(root: string): string {
+  const gitDir = path.join(root, ".git");
+  try {
+    if (fs.statSync(gitDir).isDirectory()) return path.join(gitDir, "pi-closeout", "registry.jsonl");
+  } catch {
+    /* no git dir */
+  }
+  return path.join(root, REGISTRY_FILE);
+}
+
 /**
  * Resolve where rows go. "auto": reuse a pi-checkout-guard registry when one
  * is discoverable (git common dir, root .pi-checkout-guard/, or legacy
- * .session-registry.jsonl), else <root>/.pi-closeout.jsonl.
+ * .session-registry.jsonl), else fallbackRegistryPath(root).
  */
 export function resolveRegistry(root: string, config: string): RegistryMode {
   if (config === "none") return "none";
@@ -49,7 +70,7 @@ export function resolveRegistry(root: string, config: string): RegistryMode {
   for (const c of candidates) {
     if (fs.existsSync(c)) return { path: c };
   }
-  return { path: path.join(root, ".pi-closeout.jsonl") };
+  return { path: fallbackRegistryPath(root) };
 }
 
 export interface CloseoutRow {

@@ -31,7 +31,8 @@ export interface CloseoutConfig {
   checkWorkSessionTrailer: "auto" | boolean;
   /**
    * Where identity/closeout rows are appended: "auto" (reuse a
-   * pi-checkout-guard registry when present, else <root>/.pi-closeout.jsonl),
+   * pi-checkout-guard registry when present, else the git dir's
+   * pi-closeout/registry.jsonl, else <root>/.pi-closeout.jsonl),
    * "none", or an explicit path (absolute, or relative to repo root).
    */
   registry: "auto" | "none" | string;
@@ -47,7 +48,7 @@ export function defaultConfig(): CloseoutConfig {
     childRepos: true,
     checkStaged: true,
     checkUntracked: true,
-    ignoreUntracked: [".session-registry.jsonl", CONFIG_FILE],
+    ignoreUntracked: [".session-registry.jsonl", ".pi-closeout.jsonl", CONFIG_FILE],
     registry: "auto",
     checkWorkSessionTrailer: "auto",
   };

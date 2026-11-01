@@ -13,7 +13,12 @@
  *
  * 3. SHUTDOWN — session_shutdown runs the gate best-effort and records the
  *    findings count, so "this session closed with N loose ends" is a
- *    persisted, greppable fact.
+ *    persisted, greppable fact (`ok` is false when findings exist).
+ *
+ * The repo is resolved LAZILY from the session cwd on each hook, not once at
+ * extension load: pi is often started outside a repo and then pointed at one,
+ * and load-time resolution left this extension (and the identity row it owes
+ * the registry) permanently passive in that common case.
  *
  * Disable with CLOSEOUT_DISABLE=1. The checks are harness-agnostic:
  * scripts/session-closeout.sh runs the same gate for humans/other agents.
@@ -21,26 +26,47 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatResult, repoRoot, runCloseout, type GitRunner } from "../src/checks.ts";
-import { loadConfig } from "../src/config.ts";
-import { appendRow, resolveRegistry, workIdentity } from "../src/registry.ts";
+import { loadConfig, type CloseoutConfig } from "../src/config.ts";
+import { appendRow, resolveRegistry, workIdentity, type RegistryMode } from "../src/registry.ts";
+
+interface Active {
+  root: string;
+  config: CloseoutConfig;
+  registry: RegistryMode;
+}
 
 export default function closeoutExtension(pi: ExtensionAPI): void {
   if (process.env.CLOSEOUT_DISABLE === "1") return;
 
-  const cwd = process.cwd();
-  const root = repoRoot(cwd);
-  if (!root) return; // not a git repo; passive
-
-  const config = loadConfig(root);
-  const registry = resolveRegistry(root, config.registry);
   const name = sessionDisplayName();
   let shortId = "";
+  let active: Active | undefined;
 
   const identity = (): string => workIdentity("pi", shortId, name);
 
-  const gate = (strict: boolean, run: GitRunner | undefined = undefined): { count: number; output: string } => {
-    const result = runCloseout(root, config, run);
-    appendRow(registry, { ts: Date.now(), type: "closeout", name, pid: process.pid, identity: identity(), ok: true, findings: result.findings.length });
+  /** Resolve the repo for this cwd (memoised per root). */
+  const forCwd = (cwd: string | undefined): Active | undefined => {
+    const dir = cwd ?? process.cwd();
+    const root = repoRoot(dir);
+    if (!root) return undefined;
+    if (!active || active.root !== root) {
+      const config = loadConfig(root);
+      active = { root, config, registry: resolveRegistry(root, config.registry) };
+    }
+    return active;
+  };
+
+  const gate = (current: Active, strict: boolean, run: GitRunner | undefined = undefined): { count: number; output: string } => {
+    const result = runCloseout(current.root, current.config, run);
+    appendRow(current.registry, {
+      ts: Date.now(),
+      type: "closeout",
+      name,
+      pid: process.pid,
+      identity: identity(),
+      ok: result.findings.length === 0,
+      findings: result.findings.length,
+    });
     if (strict && result.findings.length > 0) {
       throw new Error(formatResult(result, identity()));
     }
@@ -49,21 +75,30 @@ export default function closeoutExtension(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (_event, ctx) => {
     shortId = sessionId(ctx);
-    appendRow(registry, { ts: Date.now(), type: "identity", name, pid: process.pid, identity: identity() });
+    const current = forCwd(ctx?.cwd);
+    if (!current) return;
+    appendRow(current.registry, { ts: Date.now(), type: "identity", name, pid: process.pid, identity: identity() });
   });
 
   pi.registerCommand("closeout", {
     description: "Run the session closeout gate (staged sweep-fuel, untracked stash-bait, dirty child repos, open claims, Work-Session trailer gaps)",
     handler: async (args: string, ctx) => {
+      const current = forCwd(ctx?.cwd);
+      if (!current) {
+        report(ctx, "No git repository here — nothing to close out.", "info");
+        return;
+      }
       const strict = /(^|\s)--strict\b/.test(args ?? "");
-      const res = gate(strict);
+      const res = gate(current, strict);
       report(ctx, `${res.count === 0 ? "clean" : `${res.count} finding(s)`}\n\n${res.output}`, res.count > 0 ? "warning" : "info");
     },
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, ctx) => {
+    const current = forCwd(ctx?.cwd) ?? active;
+    if (!current) return;
     try {
-      gate(false);
+      gate(current, false);
     } catch {
       /* best-effort: the process is exiting */
     }

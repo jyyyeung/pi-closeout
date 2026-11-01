@@ -29,7 +29,7 @@ session-closeout: 2 finding(s)
 | **`/closeout` command** | Runs the gate, reports inline. `--strict` throws on findings (script/CI use). |
 | **Shutdown gate** | Runs once, best-effort, at session end — records the findings count so "closed with N loose ends" is greppable history. Never blocks shutdown. |
 | **Work-Session identity** | At session start, derives the identity string (bare full PI_SESSION_ID on pi; legacy `harness/<id8> (name)` elsewhere) and appends an identity row — the exact string commits should carry as a `Work-Session:` trailer (advisory). |
-| **Registry synergy** | Reuses a [pi-checkout-guard](https://github.com/jyyyeung/pi-checkout-guard) registry when present (identity/closeout rows interleave with presence rows), a legacy `.session-registry.jsonl`, or falls back to `.pi-closeout.jsonl`. |
+| **Registry synergy** | Reuses a [pi-checkout-guard](https://github.com/jyyyeung/pi-checkout-guard) registry when present (identity/closeout rows interleave with presence rows), a legacy `.session-registry.jsonl`, or falls back to `.git/pi-closeout/registry.jsonl` — inside the git dir, so the registry never becomes an untracked file the gate itself reports. |
 | **Harness-agnostic script** | `scripts/session-closeout.sh` runs the same gate for humans, Claude Code (`Stop` hook), Codex, cron — env-configurable, zero dependencies beyond git. |
 
 **Work-Session trailers.** Some host setups stamp every commit with an
@@ -40,7 +40,10 @@ queries come up empty. The gate flags recent commits missing the trailer — the
 10 most recent, plus an overflow count. Detection is automatic and quiet: it
 inspects the last 30 commits, and if none carries a `Work-Session` trailer the
 convention is treated as not in use and the check emits nothing at all — repos
-that never adopted it get zero extra output.
+that never adopted it get zero extra output. Where the convention *is* in use,
+"auto" only looks at commits **newer than the newest trailer-bearing commit**:
+history from before adoption (`init`, first imports) is not a gap, and flagging
+it buried the one real miss in a wall of pre-convention noise.
 
 ## Install
 
@@ -58,7 +61,7 @@ root:
   "childRepos": true,
   "checkStaged": true,
   "checkUntracked": true,
-  "ignoreUntracked": [".session-registry.jsonl"],
+  "ignoreUntracked": [".session-registry.jsonl", ".pi-closeout.jsonl"],
   "registry": "auto",
   "checkWorkSessionTrailer": "auto"
 }
@@ -72,7 +75,7 @@ root:
 | `checkStaged` / `checkUntracked` | `true` | Toggle the two hard findings. |
 | `ignoreUntracked` | see above | Untracked paths never flagged. |
 | `registry` | `"auto"` | `"auto"` / `"none"` / explicit path for identity+closeout rows. |
-| `checkWorkSessionTrailer` | `"auto"` | `"auto"` flags commits missing the `Work-Session:` trailer only when the convention is detected in the last 30 commits (completely silent otherwise); `true` always checks; `false` disables. |
+| `checkWorkSessionTrailer` | `"auto"` | `"auto"` flags commits missing the `Work-Session:` trailer only when the convention is detected in the last 30 commits, and only for commits newer than the newest stamped one (completely silent otherwise); `true` checks every non-merge commit in the window; `false` disables. |
 
 Disable entirely with `CLOSEOUT_DISABLE=1`. Set `WORK_SESSION` to force the
 identity string (any harness).
