@@ -154,7 +154,7 @@ mutations) for full shared-checkout hygiene: guard = during, closeout = after.
 | Requirement | Needed for | If missing |
 |---|---|---|
 | pi ≥ 1.3 | the extension and `/closeout` | the shell script still works |
-| Node ≥ 20 | the extension | same |
+| Node ≥ 20 (22.6+ to run the tests) | the extension | same |
 | git | everything | the gate reports nothing to check |
 | a task file | claim findings | claims are simply not checked |
 
