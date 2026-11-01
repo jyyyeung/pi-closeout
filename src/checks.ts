@@ -58,7 +58,7 @@ export function runCloseout(
         detail: `staged-but-uncommitted (concurrent-session sweep fuel):\n${indent(staged)}`,
       });
     } else {
-      notes.push("nothing staged");
+      notes.push("✓ nothing staged");
     }
   }
 
@@ -72,15 +72,15 @@ export function runCloseout(
         detail: `untracked files (stash-cycle bait — commit, move, or own them):\n${indent(untracked.join("\n"))}`,
       });
     } else {
-      notes.push("no untracked files");
+      notes.push("✓ no untracked files");
     }
   }
 
   const modified = safe(() => run(["status", "--short", "--untracked-files=no"], root));
   if (modified) {
-    notes.push(`modified at this root (finish, claim, or hand off):\n${indent(modified)}`);
+    notes.push(`• modified at this root (finish, claim, or hand off):\n${indent(modified)}`);
   } else {
-    notes.push("clean root tree");
+    notes.push("✓ clean root tree");
   }
 
   if (config.childRepos) {
@@ -93,7 +93,7 @@ export function runCloseout(
         findings.push({ kind: "child", detail: `child repo '${child}' has uncommitted changes (${lines} files)` });
       }
     }
-    if (childFindings === 0) notes.push("child repos clean (or none present)");
+    if (childFindings === 0) notes.push("✓ child repos clean (or none present)");
   }
 
   const claimRe = new RegExp(escapeRegExp(config.claimPattern));
@@ -191,7 +191,7 @@ function workSessionTrailerCheck(
   const candidates = mode === true ? recent : recent.slice(0, firstStamped);
   const missing = candidates.filter((c) => !c.hasWorkSession);
   if (missing.length === 0) {
-    if (recent.length > 0) notes.push("recent commits carry Work-Session trailers");
+    if (recent.length > 0) notes.push("✓ recent commits carry Work-Session trailers");
     return;
   }
   const lines = missing.slice(0, WS_CAP).map((c) => `${c.sha} ${c.subject} — no Work-Session trailer`);
@@ -259,7 +259,7 @@ function escapeRegExp(s: string): string {
 export function formatResult(result: CloseoutResult, identity: string): string {
   const head = [`session closeout — ${result.root}`];
   if (identity) head.push(`  identity: Work-Session: ${identity}`);
-  for (const n of result.notes) head.push(`  ✓/• ${n}`);
+  for (const n of result.notes) head.push(`  ${n}`);
   for (const f of result.findings) head.push(`  ✗ [${f.kind}] ${f.detail}`);
   head.push(result.findings.length > 0 ? `session-closeout: ${result.findings.length} finding(s)` : "session-closeout: clean");
   return head.join("\n");

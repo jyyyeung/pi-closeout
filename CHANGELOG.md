@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.3
+
+Fixed:
+
+- **Notes and findings were indistinguishable in `/closeout` output.**
+  `formatResult` prefixed every note with the literal `✓/• `, so "nothing
+  staged" and "modified at this root …" printed with the same ambiguous marker.
+  Notes now carry their own marker (`✓` for a clean check, `•` for information)
+  and `formatResult` prints them verbatim.
+
+Docs:
+
+- The README quick start now quotes the bytes `/closeout` actually emits
+  (leading `<n> finding(s)` line, the `identity:` line, notes before findings,
+  `session-closeout: …` footer); `claimPattern`'s default is documented without
+  a trailing space; `ignoreUntracked` includes `.pi-closeout.json`; the script's
+  env overrides and exit codes are listed.
+
 ## 0.1.2
 
 Fixed:

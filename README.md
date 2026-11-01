@@ -35,15 +35,23 @@ When the session ends — or when you ask:
 
 ```
 $ /closeout
+2 finding(s)
+
 session closeout — /repo
+  identity: Work-Session: 01a2b3c4-56af-75c8-a90d-2a0359a79cbc
   ✓ nothing staged
-  ✗ [untracked] untracked files (stash-cycle bait — commit, move, or own them):
-      evidence/r4-fails-on-main.txt
   ✓ clean root tree
+  ✓ child repos clean (or none present)
+  ✗ [untracked] untracked files (stash-cycle bait — commit, move, or own them):
+    evidence/r4-fails-on-main.txt
   ✗ [claim] open claims in TASKS.md (resolve or re-claim):
-      12: fix pagination — claimed @alice 2026-10-18
+    3: - fix pagination — claimed @alice 2026-10-18
 session-closeout: 2 finding(s)
 ```
+
+Clean checks print as `✓` notes, informational ones (a modified-but-uncommitted
+root tree) as `•` notes, findings as `✗ [kind]`. A clean run ends
+`session-closeout: clean`.
 
 `--strict` throws on findings instead of reporting them, for script and CI use.
 The shutdown gate runs the same checks once at session end, best-effort, and
@@ -59,7 +67,7 @@ history. It never blocks shutdown.
 | **Shutdown gate** | Runs once, best-effort, at session end — records the findings count so "closed with N loose ends" is greppable history. Never blocks shutdown. |
 | **Work-Session identity** | At session start, derives the identity string (bare full PI_SESSION_ID on pi; legacy `harness/<id8> (name)` elsewhere) and appends an identity row — the exact string commits should carry as a `Work-Session:` trailer (advisory). |
 | **Registry synergy** | Reuses a [pi-checkout-guard](https://github.com/jyyyeung/pi-checkout-guard) registry when present (identity/closeout rows interleave with presence rows), a legacy `.session-registry.jsonl`, or falls back to `.git/pi-closeout/registry.jsonl` — inside the git dir, so the registry never becomes an untracked file the gate itself reports. |
-| **Harness-agnostic script** | `scripts/session-closeout.sh` runs the same gate for humans, Claude Code (`Stop` hook), Codex, cron — env-configurable, zero dependencies beyond git. |
+| **Harness-agnostic script** | `scripts/session-closeout.sh` runs the same gate for humans, Claude Code (`Stop` hook), Codex, cron — zero dependencies beyond git. Env overrides: `WORK_SESSION`, `CLAIMS_FILE`, `CLAIMS_PATTERN`, `CLOSEOUT_REGISTRY`, `CHECK_WORK_SESSION_TRAILER`; exit 0 clean, 1 findings with `--strict`, 2 usage/context error. |
 
 ### Work-Session trailers
 
@@ -89,7 +97,7 @@ Optional, at the repo root:
   "childRepos": true,
   "checkStaged": true,
   "checkUntracked": true,
-  "ignoreUntracked": [".session-registry.jsonl", ".pi-closeout.jsonl"],
+  "ignoreUntracked": [".session-registry.jsonl", ".pi-closeout.jsonl", ".pi-closeout.json"],
   "registry": "auto",
   "checkWorkSessionTrailer": "auto"
 }
@@ -98,7 +106,7 @@ Optional, at the repo root:
 | Key | Default | Meaning |
 |---|---|---|
 | `claimsFiles` | `["TASKS.md"]` | Files scanned for open claims. |
-| `claimPattern` | `"— claimed @ "` | Substring marking a claimed line. |
+| `claimPattern` | `"— claimed @"` | Substring marking a claimed line. |
 | `childRepos` | `true` | Check nested repos (depth ≤ 2) for dirty trees. |
 | `checkStaged` / `checkUntracked` | `true` | Toggle the two hard findings. |
 | `ignoreUntracked` | see above | Untracked paths never flagged. |
