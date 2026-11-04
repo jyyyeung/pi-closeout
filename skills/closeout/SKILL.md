@@ -1,6 +1,6 @@
 ---
 name: closeout
-description: Session closeout gate — run before ending a work session, before claiming a task done, or when /closeout reports findings. Flags staged-but-uncommitted sweep fuel, untracked stash-bait, dirty child repos, and open task claims on a shared checkout.
+description: Session closeout gate — run before ending a work session, before claiming a task done, or when /closeout reports findings. Flags staged-but-uncommitted sweep fuel, untracked stash-bait, dirty child repos, open task claims, still-open issues referenced by session commits, and spec tracker debt.
 ---
 
 # closeout skill
@@ -11,7 +11,8 @@ You are about to end a session, hand off, or declare work "done" on a
 checkout that other agent sessions (or humans) may touch next. Loose ends you
 leave become THEIR incidents: staged-but-uncommitted files get swept into
 whoever commits next; untracked files get eaten by the next stash cycle;
-unclaimed task lines go stale.
+unclaimed task lines go stale; open issues and unflipped spec statuses rot
+the tracker.
 
 ## Protocol
 
@@ -25,6 +26,13 @@ unclaimed task lines go stale.
      hand off explicitly.
    - `claim` — open claims in the task file: resolve, or re-claim with a
      fresh date.
+   - `issue` — GitLab issues still open that this session's landed commits
+     reference (check 6, `--work-session <full-uuid>`): close them with an
+     evidence note, or record why they stay open.
+   - `spec-tracker` — spec tracker debt (check 7): fully-ticked specs whose
+     status was never flipped to a done state; active specs with zero ticks
+     and a tasks step older than 3 days. Flip the status or verify whether
+     work landed without updating the tracker.
    - `trailer` — recent commits missing the `Work-Session` trailer (only
      when the repo already uses the convention): amend unpushed commits to
      add it; leave pushed ones and note the gap in your handoff.
